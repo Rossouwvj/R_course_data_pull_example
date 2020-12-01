@@ -1,0 +1,118 @@
+---
+title: "Report example"
+author: "Rossouw"
+date: "30/11/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(pacman)
+p_load(rdbnomics, tidyverse, lubridate, xtable)
+```
+
+# Interest rates  
+## BRICS
+
+We can write some stuff about the graphs here. Some fancy analysis using our big economist brains. 
+
+```{r brics_graphs, echo=FALSE,results='asis'}
+
+policy_rates <-  rdb(provider_code = "BIS", dataset_code = "cbpol" , mask = "D..") %>% 
+  filter(!is.na(value))
+
+policy_rates_subset <- policy_rates %>% 
+  filter(`Reference area` %in% c("China", "Brazil", "South Africa", "India", "Russia")) %>% 
+  filter(period >= as.Date("2019-09-30"))
+  
+
+ggplot(policy_rates_subset, aes(period, value, group = 1)) + 
+  geom_line() + theme_bw() + facet_wrap(~`Reference area`, scales = "free_y", ncol =2) + ylab("") +
+  xlab("")
+```
+
+We can also talk through it in tablulated format. Maybe we want to see when the last time was that a rate changed?
+
+```{r brics_table, echo=FALSE,results='asis'}
+change_index <- which(policy_rates_subset$value != dplyr::lag(policy_rates_subset$value) & 
+        policy_rates_subset$`Reference area` == dplyr::lag(policy_rates_subset$`Reference area`))
+
+
+prev_pol <- policy_rates_subset[(change_index-1),] %>% 
+  group_by(series_name) %>% 
+  summarise(period=max(period))
+
+pol_tab_prev <- policy_rates_subset %>% 
+  inner_join(prev_pol)
+
+last_pol <- policy_rates_subset[change_index,] %>% 
+  group_by(series_name) %>% 
+  summarise(period=max(period))
+
+pol_tab_last <- policy_rates_subset %>% 
+  inner_join(last_pol)
+
+pol_tab_all <- as.data.frame(matrix(data = NA, nrow = 5, ncol = 4))
+colnames(pol_tab_all) <- c("Country", "Current rate", "Previous rate", "Date of change")
+
+pol_tab_all$Country <- pol_tab_last$`Reference area`
+pol_tab_all$`Current rate` <- pol_tab_last$value
+pol_tab_all$`Prev rate` <- pol_tab_prev$value
+pol_tab_all$`Date of change` <- pol_tab_last$original_period
+
+print.xtable(xtable(pol_tab_all, caption = "Summary table of last movements"), comment = FALSE,
+             caption.placement = getOption("xtable.caption.placement", "top"))
+```
+
+## G7
+
+We can also look at the G7 countries for perspective. 
+
+```{r g7_graphs, echo=FALSE,results='asis'}
+
+policy_rates_g7 <- policy_rates %>% 
+  filter(`Reference area` %in% c("United States", "Euro area", "Japan", "United Kingdom", "Canada")) %>% 
+  filter(period >= as.Date("2019-09-30"))
+
+ggplot(policy_rates_g7, aes(period, value, group = 1)) + 
+  geom_line() + theme_bw() + facet_wrap(~`Reference area`, ncol = 2, scales = "free_y")
+```
+
+Maybe we want to see them in tabulated format aswell? 
+
+```{r g7_tables, echo=FALSE,results='asis'}
+
+policy_rates_g7 <- policy_rates %>% 
+  filter(`Reference area` %in% c("United States", "Euro area", "Japan", "United Kingdom", "Canada"))
+
+change_index <- which(policy_rates_g7$value != dplyr::lag(policy_rates_g7$value) & 
+        policy_rates_g7$`Reference area` == dplyr::lag(policy_rates_g7$`Reference area`))
+
+
+prev_pol <- policy_rates_g7[(change_index-1),] %>% 
+  group_by(series_name) %>% 
+  summarise(period=max(period))
+
+pol_tab_prev <- policy_rates_g7 %>% 
+  inner_join(prev_pol)
+
+last_pol <- policy_rates_g7[change_index,] %>% 
+  group_by(series_name) %>% 
+  summarise(period=max(period))
+
+pol_tab_last <- policy_rates_g7 %>% 
+  inner_join(last_pol)
+
+pol_tab_all <- as.data.frame(matrix(data = NA, nrow = 5, ncol = 4))
+colnames(pol_tab_all) <- c("Country", "Current rate", "Prev rate", "Date of change")
+
+pol_tab_all$Country <- pol_tab_last$`Reference area`
+pol_tab_all$`Current rate` <- pol_tab_last$value
+pol_tab_all$`Prev rate` <- pol_tab_prev$value
+pol_tab_all$`Date of change` <- pol_tab_last$original_period
+
+print.xtable(xtable(pol_tab_all, caption = "Summary table of last movements"), comment = FALSE,
+             caption.placement = getOption("xtable.caption.placement", "top"))
+
+```
+
